@@ -19,3 +19,6 @@ Prereq: Compile the app
 2. Run hello_triangle.exe:D
 
 You can change the build name simply just by changing the project argument in CMakeLists.txt
+
+## Known Problem
+1. File format not recognized. Solution : update the gcc compiler to newer version
