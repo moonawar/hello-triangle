@@ -7,6 +7,49 @@
 #define POS_ATTRIB 0
 #define COLOR_ATTRIB 1
 
+static unsigned int CompileShader(unsigned int type, const std::string &source)
+{
+    unsigned int id = glCreateShader(type);
+    const char *src = &source[0];
+    glShaderSource(id, 1, &src, nullptr);
+    glCompileShader(id);
+
+    int status;
+    glGetShaderiv(id, GL_COMPILE_STATUS, &status);
+
+    if (status == GL_FALSE)
+    {
+        int length;
+        glGetShaderiv(id, GL_INFO_LOG_LENGTH, &length);
+        char *message = (char *)alloca(length * sizeof(char));
+        glGetShaderInfoLog(id, length, &length, message);
+        std::cout << "Failed to compile " << (type == GL_VERTEX_SHADER ? "vertex" : "fragment") << " shader" << std::endl;
+        std::cout << message << std::endl;
+        glDeleteShader(id);
+        return 0;
+    }
+
+    return id;
+}
+
+
+static unsigned int CreateShader(const std::string &vertexShader, const std::string &fragmentShader)
+{
+    unsigned int program = glCreateProgram();
+
+    unsigned int vs = CompileShader(GL_VERTEX_SHADER, vertexShader);
+    glAttachShader(program, vs);
+    unsigned int fs = CompileShader(GL_FRAGMENT_SHADER, fragmentShader);
+    glAttachShader(program, fs);
+
+    glLinkProgram(program);
+    glValidateProgram(program);
+
+    glDeleteShader(vs);
+    glDeleteShader(fs);
+    return program;
+}
+
 int main(void)
 {
     GLFWwindow* window;
@@ -55,6 +98,37 @@ int main(void)
     glEnableVertexAttribArray(COLOR_ATTRIB);
     glVertexAttribPointer(COLOR_ATTRIB, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(2 * sizeof(float)));
 
+    std::string vertexShader = R"glsl(
+        #version 330 core
+
+        layout(location = 0) in vec4 position;
+        layout(location = 1) in vec3 color;
+
+        out vec4 vColor;
+
+        void main()
+        {
+            gl_Position = position;
+            vColor = vec4(color, 1.0);
+        }
+    )glsl";
+
+    std::string fragmentShader = R"glsl(
+        #version 330 core
+
+        in vec4 vColor;
+
+        out vec4 color;
+
+        void main()
+        {
+            color = vColor;
+        }
+    )glsl";
+
+    unsigned int shader = CreateShader(vertexShader, fragmentShader);
+    glUseProgram(shader);
+
     /* Loop until the user closes the window */
     while (!glfwWindowShouldClose(window))
     {
@@ -70,6 +144,7 @@ int main(void)
         glfwPollEvents();
     }
 
+    glDeleteProgram(shader);
     glfwTerminate();
     
     return 0;
