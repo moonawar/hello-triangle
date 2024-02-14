@@ -15,11 +15,11 @@ void main()
 #shader fragment
 #version 330 core
 
-in vec4 vColor;
-
+// in vec4 vColor;
+uniform vec4 uColor;
 out vec4 color;
 
 void main()
 {
-    color = vColor;
+    color = uColor;
 }
