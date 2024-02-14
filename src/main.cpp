@@ -2,10 +2,62 @@
 
 #include <GLEW/glew.h>
 #include <GLFW/glfw3.h>
+
 #include <iostream>
+#include <fstream>
+#include <string>
+#include <sstream>
 
 #define POS_ATTRIB 0
 #define COLOR_ATTRIB 1
+
+struct ShaderProgramSource
+{
+    std::string VertexShader;
+    std::string FragmentShader;
+};
+
+static ShaderProgramSource ParseShader(const std::string &filepath)
+{
+
+    enum class ShaderType
+    {
+        NONE = -1, VERTEX = 0, FRAGMENT = 1
+    };
+
+    std::ifstream stream(filepath);
+    if (!stream.is_open())
+    {
+        std::cout << "Failed to open file" << std::endl;
+        return { "", "" };
+    }
+
+    std::string line;
+    std::stringstream ss[2];
+    
+    ShaderType type = ShaderType::NONE;
+    while (getline(stream, line))
+    {
+        if (line.find("#shader") != std::string::npos)
+        {
+            if (line.find("vertex") != std::string::npos)
+            {
+                type = ShaderType::VERTEX;
+            }
+            else if (line.find("fragment") != std::string::npos)
+            {
+                type = ShaderType::FRAGMENT;
+            }
+        }
+        else
+        {
+            ss[(int)type] << line << '\n';
+        }
+    }
+
+    return { ss[0].str(), ss[1].str() };
+}
+
 
 static unsigned int CompileShader(unsigned int type, const std::string &source)
 {
@@ -79,54 +131,43 @@ int main(void)
 
     std::cout << glGetString(GL_VERSION) << std::endl;
 
-    unsigned int buffer;
-    glGenBuffers(1, &buffer);
-    glBindBuffer(GL_ARRAY_BUFFER, buffer);
-
-    float vertices[15] = 
+    // Data Definition
+    unsigned int dataCount = 5 * 4;
+    float vertices[5*4] = 
     {
-        -0.5f, -0.5f, 1.0f, 0.0f, 0.0f,
+        -0.5f, -0.5f, 0.0f, 0.0f, 0.0f,
          0.5f, -0.5f, 0.0f, 1.0f, 0.0f,
-         0.0f,  0.5f, 0.0f, 0.0f, 1.0f
+         0.5f,  0.5f, 1.0f, 1.0f, 0.0f,
+        -0.5f,  0.5f, 1.0f, 0.0f, 0.0f
     };
 
-    glBufferData(GL_ARRAY_BUFFER, 15 * sizeof(float), vertices, GL_STATIC_DRAW);
+    unsigned int indices[6] = 
+    {
+        0, 1, 2,
+        2, 3, 0
+    };
 
+    // Buffer Definition
+    unsigned int buffer; // Vertex Buffer Object
+    glGenBuffers(1, &buffer);
+    glBindBuffer(GL_ARRAY_BUFFER, buffer);
+    glBufferData(GL_ARRAY_BUFFER, dataCount * sizeof(float), vertices, GL_STATIC_DRAW);
+
+    unsigned int ibo; // Index Buffer Object
+    glGenBuffers(1, &ibo);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, 6 * sizeof(unsigned int), indices, GL_STATIC_DRAW);
+
+    // Attributes Defintion
     glEnableVertexAttribArray(POS_ATTRIB);
     glVertexAttribPointer(POS_ATTRIB, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), 0);
 
     glEnableVertexAttribArray(COLOR_ATTRIB);
     glVertexAttribPointer(COLOR_ATTRIB, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(2 * sizeof(float)));
 
-    std::string vertexShader = R"glsl(
-        #version 330 core
-
-        layout(location = 0) in vec4 position;
-        layout(location = 1) in vec3 color;
-
-        out vec4 vColor;
-
-        void main()
-        {
-            gl_Position = position;
-            vColor = vec4(color, 1.0);
-        }
-    )glsl";
-
-    std::string fragmentShader = R"glsl(
-        #version 330 core
-
-        in vec4 vColor;
-
-        out vec4 color;
-
-        void main()
-        {
-            color = vColor;
-        }
-    )glsl";
-
-    unsigned int shader = CreateShader(vertexShader, fragmentShader);
+    // Shader Linking
+    ShaderProgramSource source = ParseShader("res/shaders/Basic.shader");
+    unsigned int shader = CreateShader(source.VertexShader, source.FragmentShader);
     glUseProgram(shader);
 
     /* Loop until the user closes the window */
@@ -135,7 +176,7 @@ int main(void)
         /* Render here */
         glClear(GL_COLOR_BUFFER_BIT);
 
-        glDrawArrays(GL_TRIANGLES, 0, 3);
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr);
 
         /* Swap front and back buffers */
         glfwSwapBuffers(window);
@@ -143,7 +184,7 @@ int main(void)
         /* Poll for and process events */
         glfwPollEvents();
     }
-
+    //
     glDeleteProgram(shader);
     glfwTerminate();
     
